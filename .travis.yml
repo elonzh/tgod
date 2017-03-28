@@ -1,8 +1,6 @@
 language: go
 go:
-  - 1.6.x
-  - 1.7.x
-  - master
+  - 1.8.x
 install:
   - go get -t ./...
 script: GOMAXPROCS=4 GORACE="halt_on_error=1" go test -race -v ./...
