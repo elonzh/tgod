@@ -1,4 +1,4 @@
-package tgod
+package tieba
 
 import (
 	"bytes"
@@ -14,6 +14,13 @@ type TextGenerator interface {
 type ResponseStatus struct {
 	ErrorCode string `json:"error_code"`
 	ErrorMsg  string `json:"error_msg"`
+}
+
+func (status ResponseStatus) String() string {
+	if status.ErrorCode == "0" {
+		return fmt.Sprintf("Success %s: %s", status.ErrorCode, status.ErrorMsg)
+	}
+	return fmt.Sprintf("Error %s: %s", status.ErrorCode, status.ErrorMsg)
 }
 
 func (status ResponseStatus) CheckStatus() error {
@@ -67,7 +74,7 @@ func s2b(s string) bool {
 	case "1":
 		return true
 	default:
-		Logger.Panicf("\"0\" or \"1\" is expected, not %s", s)
+		Logger.Panicf("\"0\" or \"1\" itemScheduler expected, not %s", s)
 		return false
 	}
 }
@@ -88,7 +95,6 @@ func s2b(s string) bool {
 //"total_num": "30", total_num=total_page*page_size, 没有使用价值
 //"pnum": "0", 意义不明
 //"tnum": "0", 意义不明
-
 // 因此实际使用中只有 total_page, has_more, has_prev 有作用
 type page struct {
 	PageSize    int
@@ -126,7 +132,7 @@ type threadList []Thread
 func (t *threadList) UnmarshalJSON(b []byte) error {
 	var oldThreadList []struct {
 		Thread
-		TID string `json:"tid" bson:"-"` // 忽略这个字段, 因为存在时与 ID 是一样的
+		TID string // 忽略这个字段, 因为存在时与 ID 是一样的
 	}
 	err := json.Unmarshal(b, &oldThreadList)
 	if err != nil {
@@ -138,11 +144,6 @@ func (t *threadList) UnmarshalJSON(b []byte) error {
 		}
 	}
 	return nil
-}
-
-// todo：生成整个帖子文本
-func (t Thread) GenerateText() string {
-	return ""
 }
 
 type User struct {
@@ -165,7 +166,7 @@ type ThreadListResponse struct {
 	Forum       Forum       `json:"forum,omitempty"`
 	RequestUser RequestUser `json:"user,omitempty"`
 	Page        page        `json:"page,omitempty"`
-	ThreadList  []Thread    `json:"thread_list,omitempty"`
+	ThreadList  threadList  `json:"thread_list,omitempty"`
 	UserList    []User      `json:"user_list,omitempty"`
 	ResponseStatus
 }
@@ -216,13 +217,12 @@ func (c Content) GenerateText() string {
 
 type Post struct {
 	ID       string    `json:"id"`
-	ThreadID string    // 所属帖子ID, 需自行添加
-	PostID   string    // 楼中楼所属楼层ID, 需自行添加
 	AuthorID string    `json:"author_id"`
 	Title    string    `json:"title"`
 	Floor    string    `json:"floor"`
 	Time     string    `json:"time"`
 	Content  []Content `json:"content"`
+	ThreadID string    // 所属帖子ID, 需自行添加
 }
 
 func (p Post) GenerateText() string {
@@ -234,12 +234,25 @@ func (p Post) GenerateText() string {
 	return text
 }
 
+// 将楼层和楼中楼分开存储
+// 楼中楼的数据不是完整的, 后期可能会添加完整楼中楼的获取方式
+// 虽然其内容类型与楼层是一样的, 但其重要性更低
+type SubPost struct {
+	ID       string    `json:"id"`
+	AuthorID string    `json:"author_id"`
+	Title    string    `json:"title"`
+	Floor    string    `json:"floor"`
+	Time     string    `json:"time"`
+	Content  []Content `json:"content"`
+	PostID   string    // 楼中楼所属楼层ID, 需自行添加
+}
+
 // 没有楼回复时为 "sub_post_list: []", 否则为 "sub_post_list: {"pid": "...", sub_post_list:[...]}"
-type subPostList []Post
+type subPostList []SubPost
 
 func (s *subPostList) UnmarshalJSON(b []byte) error {
 	type NestedSubPostList struct {
-		SubPostList []Post `json:"sub_post_list"` // 这里使用 SubPostList 类型会造成递归解析
+		SubPostList []SubPost `json:"sub_post_list"` // 这里使用 SubPostList 类型会造成递归解析
 	}
 	dec := json.NewDecoder(bytes.NewReader(b))
 	t, err := dec.Token()
@@ -247,7 +260,7 @@ func (s *subPostList) UnmarshalJSON(b []byte) error {
 		return err
 	}
 	if t == json.Delim('[') {
-		var subPostList []Post
+		var subPostList []SubPost
 		err = json.Unmarshal(b, &subPostList)
 		if err != nil {
 			return err
@@ -278,22 +291,20 @@ type PostListResponse struct {
 	ResponseStatus
 }
 
-// 将所有回帖和楼中楼合并为一个列表并添加对应的ID
-func (p PostListResponse) GetPostList() []Post {
-	var postList []Post
-	for _, post := range p.PostList {
-		post.Post.ThreadID = p.Thread.ID
-		postList = append(postList, post.Post)
-		for _, subPost := range post.SubPostList {
-			subPost.ThreadID = p.Thread.ID
-			subPost.PostID = post.ID
-			postList = append(postList, subPost)
+// 给楼层加上帖子ID, 给楼中楼加上楼层ID
+func (plr *PostListResponse) UnmarshalJSON(b []byte) error {
+	type aliasPostListResponse PostListResponse
+	v := new(aliasPostListResponse)
+	if err := json.Unmarshal(b, v); err != nil {
+		return err
+	}
+	// 赋值是值拷贝
+	for i := range v.PostList {
+		v.PostList[i].ThreadID = v.Thread.ID
+		for j := range v.PostList[i].SubPostList {
+			v.PostList[i].SubPostList[j].PostID = v.PostList[i].ID
 		}
 	}
-	return postList
-}
-
-// todo： 整个帖子可能不止一页, 怎么生产文本?
-func (p PostListResponse) GenerateText() string {
-	return ""
+	*plr = PostListResponse(*v)
+	return nil
 }

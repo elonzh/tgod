@@ -8,7 +8,7 @@ import (
 )
 
 type Config struct {
-	DataDir               string // 数据存储目录
+	Database              string // 数据库名称
 	MaxCrawlerGoroutines  int    // 爬虫请求最大并发
 	MaxDatabaseGoroutines int    // 最大数据库更新最大并发
 
@@ -78,9 +78,9 @@ func init() {
 	ExeDir = path.Dir(exe)
 	DefaultConfigFilePath = path.Join(ExeDir, "config.json")
 	DefaultConfig = Config{
-		DataDir:               path.Join(ExeDir, "data"),
+		Database:              "localhost/tgod",
 		MaxCrawlerGoroutines:  5,
-		MaxDatabaseGoroutines: 5,
+		MaxDatabaseGoroutines: 20,
 	}
 	GlobalConfig = DefaultConfig
 }
