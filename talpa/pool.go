@@ -13,7 +13,7 @@ func (w *worker) start() {
 		for {
 			select {
 			case job, ok := <-w.jobs:
-				if !ok{
+				if !ok {
 					return
 				}
 				w.wg.Add(1)
@@ -26,12 +26,12 @@ func (w *worker) start() {
 }
 
 type Pool struct {
-	Jobs chan <- func()
+	Jobs chan<- func()
 	wg   sync.WaitGroup
 	stop chan struct{}
 }
 
-func (p *Pool)Close() {
+func (p *Pool) Close() {
 	close(p.stop)
 	close(p.Jobs)
 	p.wg.Wait()

@@ -8,8 +8,9 @@ import (
 	"github.com/go-tgod/tgod/http"
 )
 
+var dir = path.Join(os.TempDir(), http.DefaultDumpDir)
+
 func init() {
-	dir := path.Join(os.TempDir(), "saver")
 	err := os.RemoveAll(dir)
 	if err != nil {
 		Logger.Fatalln(err)
@@ -18,13 +19,11 @@ func init() {
 	if err != nil {
 		Logger.Fatalln(err)
 	}
-	Logger.WithField("ContentDit", dir).Infoln("Content dir was created")
-	DefaultRequest.Use(http.Fingerprint(false))
-	DefaultRequest.Use(http.RequestSaver(dir, true))
-	DefaultRequest.Use(http.ResponseSaver(dir, true))
+	Logger.WithField("ContentDir", dir).Infoln("Content dir was created")
 }
 
 func TestClient_GetThreadList(t *testing.T) {
+	tldir := path.Join(dir, "tl")
 	for _, tt := range []struct {
 		kw       string
 		pn       int
@@ -36,7 +35,10 @@ func TestClient_GetThreadList(t *testing.T) {
 		{"显卡", 1, 100, 100},
 		{"显卡", 1, 101, 100},
 	} {
-		req := ThreadListRequest(tt.kw, tt.pn, tt.rn, false)
+		req := ThreadListRequest(tt.kw, tt.pn, tt.rn)
+		req.Use(http.Fingerprint(false))
+		req.Use(http.RequestDumper(tldir, true))
+		req.Use(http.ResponseDumper(tldir, true))
 		res, err := req.Do()
 		if err != nil {
 			t.Error(err)
@@ -55,12 +57,30 @@ func TestClient_GetThreadList(t *testing.T) {
 		}
 		l := len(v.ThreadList)
 		if l != tt.expected {
-			t.Errorf("%s: Length of ThreadList %d, %d expected!", res.Context.Get("FingerPrint").(string), l, tt.expected)
+			fg := res.Context.Get("FingerPrint").(string)
+			// 检查当与预期数据长度不匹配时是否有直播贴
+			// 假设只可能只有一篇直播贴
+			if l != tt.expected+1 {
+				t.Errorf("%s: Length of ThreadList %d, %d expected!", fg, l, tt.expected)
+			}
+			// 直播贴不一定是第一条数据
+			for i, thread := range v.ThreadList {
+				if thread.IsLivePost == "1" {
+					t.Logf("%s: ThreadList has a live post with index %d", fg, i)
+					break
+				}
+				if thread.IsTop != "1" {
+					t.Errorf("%s: Length of ThreadList %d, %d expected!", fg, l, tt.expected)
+					break
+				}
+			}
+
 		}
 	}
 }
 
-func TestClient_GetThread(t *testing.T) {
+func TestClient_GetPostList(t *testing.T) {
+	pldir := path.Join(dir, "pl")
 	for _, tt := range []struct {
 		tid      string
 		pn       int
@@ -75,6 +95,9 @@ func TestClient_GetThread(t *testing.T) {
 		{"4003196488", 1, 31, 30, ""},
 	} {
 		req := PostListRequest(tt.tid, tt.pn, tt.rn, false)
+		req.Use(http.Fingerprint(false))
+		req.Use(http.RequestDumper(pldir, true))
+		req.Use(http.ResponseDumper(pldir, true))
 		res, err := req.Do()
 		if err != nil {
 			t.Error(err)

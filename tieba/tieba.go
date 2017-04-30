@@ -9,5 +9,5 @@ var DefaultRequest *gen.Request
 
 func init() {
 	DefaultRequest = gen.NewRequest()
-	DefaultRequest.AddHeader("User-Agent", "bdtb for Android "+ClientVersion)
+	DefaultRequest.SetHeader("User-Agent", "bdtb for Android "+ClientVersion)
 }

@@ -73,20 +73,15 @@ const MaxThreadNum = 100
 // 获取帖子列表
 // kw 贴吧关键字
 // pn 第几页
-// rn 每页条目数量, 0<=rn<=100
-func ThreadListRequest(kw string, pn int, rn int, withGroup bool) *gen.Request {
+// rn 每页最大条目数量, 0<=rn<=100,
+// 当有直播贴时也是包含帖子列表中的, 并且不受 rn 参数的影响, 其出现的位置不一定是第一条, 可能在置顶帖后
+func ThreadListRequest(kw string, pn int, rn int) *gen.Request {
 	const method = "POST"
 	const urlStr = "http://c.tieba.baidu.com/c/f/frs/page"
 	v := copyValues(baseValues)
 	v.Set("kw", kw)
 	v.Set("pn", strconv.Itoa(pn))
 	v.Set("rn", strconv.Itoa(rn))
-	// fixme: 弄清 with_group 会对结果造成什么影响并更新测试用例
-	if withGroup {
-		v.Set("with_group", "1")
-	} else {
-		v.Set("with_group", "0")
-	}
 	q, _ := sign(v)
 
 	req := DefaultRequest.Clone()
@@ -101,7 +96,7 @@ const MaxPostNum = 30
 // 获取帖子内容
 // tid 帖子ID
 // pn 第几页
-// rn 每页条目数量, 2<=rn<=30
+// rn 每页最大条目数量, 2<=rn<=30
 // rn=0 Error 1989002: 加载数据失败
 // rn=1 Error 29: 这个楼层可能已被删除啦，去看看其他贴子吧
 // withSubPost 是否带上楼中楼

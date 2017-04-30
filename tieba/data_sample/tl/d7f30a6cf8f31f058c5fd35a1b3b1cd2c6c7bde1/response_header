@@ -1,0 +1,12 @@
+HTTP/1.1 200 OK
+Transfer-Encoding: chunked
+Connection: keep-alive
+Content-Type: application/x-javascript;charset=utf-8
+Date: Sun, 30 Apr 2017 15:09:27 GMT
+P3p: CP=" OTI DSP COR IVA OUR IND COM "
+Server: Apache
+Set-Cookie: BAIDUID=D8ADE5A5262342ED38C350F05083A062:FG=1; expires=Mon, 30-Apr-18 15:09:27 GMT; max-age=31536000; path=/; domain=.baidu.com; version=1
+Tracecode: 05667986910723350794043023
+Tracecode: 05667986910723416330043023
+Vary: Accept-Encoding
+X-Xss-Protection: 1; mode=block

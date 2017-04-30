@@ -1,0 +1,3 @@
+POST /c/f/pb/page HTTP/1.1
+Host: c.tieba.baidu.com
+User-Agent: bdtb for Android 7.0.0

@@ -21,14 +21,13 @@ type TiebaSpider struct {
 
 // 初始请求, 获取置顶帖吧最新(第一页)帖子列表
 func (t *TiebaSpider) StartRequests() []*gen.Request {
-	req := tieba.ThreadListRequest(t.forum, 1, 10, false)
+	req := tieba.ThreadListRequest(t.forum, 1, 10)
 	req.Context.Set("CallBack", t.ParseThreadList)
 	return []*gen.Request{req}
 }
 
 // 解析帖子列表, 生成每个帖子回复列表第一页请求用于得到回帖页数进行下一步请求
 func (t *TiebaSpider) ParseThreadList(res *gen.Response, helper talpa.Helper) {
-	// todo: 处理帖子列表数据
 	// 解析 json, 出错时会直接 panic 而不是返回 errCode
 	entry := t.logger.WithField("CallBack", "ParseThreadList")
 	tlr := new(tieba.ThreadListResponse)
@@ -40,8 +39,8 @@ func (t *TiebaSpider) ParseThreadList(res *gen.Response, helper talpa.Helper) {
 		return
 	}
 
-	//helper.PutJob(ForumUpsert(tlr.Forum))
-	//helper.PutJob(ThreadUpsert(tlr.ThreadList...))
+	helper.PutJob(ForumUpsert(tlr.Forum))
+	helper.PutJob(ThreadUpsert(tlr.ThreadList...))
 	if len(tlr.UserList) > 0 {
 		helper.PutJob(UserUpsert(tlr.UserList...))
 	}
@@ -74,7 +73,7 @@ func (t *TiebaSpider) handlePostList(entry *logrus.Entry, res *gen.Response, hel
 		"Page":        plr.Page.CurrentPage,
 		"NumPostList": len(plr.PostList),
 	}).Debugln()
-	helper.PutJob(ForumUpsert(plr.Forum))
+	//helper.PutJob(ForumUpsert(plr.Forum))
 	if len(plr.UserList) > 0 {
 		helper.PutJob(UserUpsert(plr.UserList...))
 	}
@@ -93,7 +92,6 @@ func (t *TiebaSpider) handlePostList(entry *logrus.Entry, res *gen.Response, hel
 
 // 解析第一页回帖, 生成后序的请求
 func (t *TiebaSpider) ParsePostListPage(res *gen.Response, helper talpa.Helper) {
-	// todo: 处理第一页数据
 	entry := t.logger.WithField("CallBack", "ParsePostListPage")
 	plr := t.handlePostList(entry, res, helper)
 	// 第一页已经得到了
@@ -110,6 +108,5 @@ func (t *TiebaSpider) ParsePostListPage(res *gen.Response, helper talpa.Helper) 
 // 解析后续回帖
 func (t *TiebaSpider) ParsePostList(res *gen.Response, helper talpa.Helper) {
 	entry := t.logger.WithField("CallBack", "ParsePostList")
-	// todo: 处理后续回帖数据
 	t.handlePostList(entry, res, helper)
 }

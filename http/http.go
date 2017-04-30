@@ -4,13 +4,14 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"net/http/httputil"
 	"os"
 	"path"
 
 	genc "gopkg.in/h2non/gentleman.v2/context"
 	genp "gopkg.in/h2non/gentleman.v2/plugin"
 )
+
+const DefaultDumpDir = "dump"
 
 func Fingerprint(withHeader bool) genp.Plugin {
 	return genp.NewPhasePlugin("before dial", func(ctx *genc.Context, h genc.Handler) {
@@ -24,61 +25,75 @@ func Fingerprint(withHeader bool) genp.Plugin {
 	})
 }
 
-func RequestSaver(dir string, body bool) genp.Plugin {
+func RequestDumper(dir string, body bool) genp.Plugin {
 	return genp.NewPhasePlugin("before dial", func(ctx *genc.Context, h genc.Handler) {
 		fingerprint, ok := ctx.GetOk("FingerPrint")
 		if !ok {
-			h.Error(ctx, errors.New("RequestSaver: Can not get \"FingerPrint\" from context"))
+			h.Error(ctx, errors.New("RequestDumper: Can not get \"FingerPrint\" from context"))
 			return
 		}
 		realDir := dir
 		if realDir == "" {
-			realDir = "saver"
+			realDir = DefaultDumpDir
 		}
 		realDir = path.Join(realDir, fingerprint.(string))
 		if err := os.MkdirAll(realDir, os.ModePerm); err != nil {
-			h.Error(ctx, fmt.Errorf("RequestSaver: %s", err))
+			h.Error(ctx, fmt.Errorf("RequestDumper: %s", err))
 			return
 		}
-		dump, err := httputil.DumpRequest(ctx.Request, body)
+		dumpHeader, dumpBody, err := DumpRequest(ctx.Request, body)
 		if err != nil {
-			h.Error(ctx, fmt.Errorf("RequestSaver: %s", err))
+			h.Error(ctx, fmt.Errorf("RequestDumper: %s", err))
 			return
 		}
-		err = ioutil.WriteFile(path.Join(realDir, "request"), dump, os.ModePerm)
+		err = ioutil.WriteFile(path.Join(realDir, "request_header"), dumpHeader, os.ModePerm)
 		if err != nil {
-			h.Error(ctx, fmt.Errorf("RequestSaver: %s", err))
+			h.Error(ctx, fmt.Errorf("RequestDumper: %s", err))
 			return
+		}
+		if body {
+			err = ioutil.WriteFile(path.Join(realDir, "request_body"), dumpBody, os.ModePerm)
+			if err != nil {
+				h.Error(ctx, fmt.Errorf("RequestDumper: %s", err))
+				return
+			}
 		}
 		h.Next(ctx)
 	})
 }
 
-func ResponseSaver(dir string, body bool) genp.Plugin {
+func ResponseDumper(dir string, body bool) genp.Plugin {
 	return genp.NewResponsePlugin(func(ctx *genc.Context, h genc.Handler) {
 		fingerprint, ok := ctx.GetOk("FingerPrint")
 		if !ok {
-			h.Error(ctx, errors.New("ResponseSaver: Can not get \"FingerPrint\" from context"))
+			h.Error(ctx, errors.New("ResponseDumper: Can not get \"FingerPrint\" from context"))
 			return
 		}
 		realDir := dir
 		if realDir == "" {
-			realDir = "saver"
+			realDir = DefaultDumpDir
 		}
 		realDir = path.Join(realDir, fingerprint.(string))
 		if err := os.MkdirAll(realDir, os.ModePerm); err != nil {
-			h.Error(ctx, fmt.Errorf("RequestSaver: %s", err))
+			h.Error(ctx, fmt.Errorf("ResponseDumper: %s", err))
 			return
 		}
-		dump, err := httputil.DumpResponse(ctx.Response, body)
+		dumpHeader, dumpBody, err := DumpResponse(ctx.Response, body)
 		if err != nil {
-			h.Error(ctx, fmt.Errorf("ResponseSaver: %s", err))
+			h.Error(ctx, fmt.Errorf("ResponseDumper: %s", err))
 			return
 		}
-		err = ioutil.WriteFile(path.Join(realDir, "response"), dump, os.ModePerm)
+		err = ioutil.WriteFile(path.Join(realDir, "response_header"), dumpHeader, os.ModePerm)
 		if err != nil {
-			h.Error(ctx, fmt.Errorf("ResponseSaver: %s", err))
+			h.Error(ctx, fmt.Errorf("ResponseDumper: %s", err))
 			return
+		}
+		if body {
+			err = ioutil.WriteFile(path.Join(realDir, "response_body"), dumpBody, os.ModePerm)
+			if err != nil {
+				h.Error(ctx, fmt.Errorf("ResponseDumper: %s", err))
+				return
+			}
 		}
 		h.Next(ctx)
 	})

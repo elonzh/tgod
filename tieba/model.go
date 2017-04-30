@@ -1,3 +1,4 @@
+// 包含了数据接口返回数据的结构, 忽略了一些无用数据和未知字段
 package tieba
 
 import (
@@ -43,24 +44,27 @@ type Forum struct {
 	PostNum     string `json:"post_num,omitempty"`
 	IsReadonly  string `json:"is_readonly,omitempty"`
 	IsStageForm string `json:"is_stage_form,omitempty"`
-	PostPrefix  string `json:"post_prefix,omitempty"`
 }
 
 // 返回的响应有 id 和 tid 两个字段, 当帖子没有 tid 时是一个广告贴
 // reply_num 包括了楼中楼数量, 为总回帖量(不包括一楼), 不能用来计算页数
+// media 包含了帖子概览时的媒体文件, 这里不
 type Thread struct {
-	ID          string              `json:"id"`
-	Title       string              `json:"title"`
-	AuthorID    string              `json:"author_id"`
-	ReplyNum    string              `json:"reply_num"`
-	ViewNum     string              `json:"view_num"`
-	CreateTime  string              `json:"create_time"`
-	LastTimeInt string              `json:"last_time_int"`
-	IsTop       string              `json:"is_top"`  // 置顶帖
-	IsGood      string              `json:"is_good"` // 精品贴
-	IsNTitle    string              `json:"is_ntitle"`
-	IsMemberTop string              `json:"is_member_top"`
-	Media       []map[string]string `json:"media"`
+	ID         string `json:"id"`
+	Title      string `json:"title"`
+	AuthorID   string `json:"author_id"`
+	ReplyNum   string `json:"reply_num"`
+	ViewNum    string `json:"view_num"`
+	CreateTime string `json:"create_time"`   // 类型为时间戳, 可能不存在此字段, 比如为直播贴
+	LastTime   string `json:"last_time_int"` // 类型为时间戳
+	IsTop      string `json:"is_top"`        // 置顶帖
+	IsGood     string `json:"is_good"`       // 精品贴
+	IsNotice   string `json:"is_notice"`     // 通知贴
+	IsProtal   string `json:"is_protal"`
+	IsBakan    string `json:"is_bakan"`    // 吧刊贴
+	IsVote     string `json:"is_vote"`     // 投票贴
+	IsActivity string `json:"is_activity"` // 活动帖
+	IsLivePost string `json:"is_livepost"` // 直播贴
 }
 
 func (t *Thread) String() string {
@@ -79,7 +83,6 @@ func s2b(s string) bool {
 	}
 }
 
-// 字段说明:
 // 通用字段
 //"page_size": "30", 请求的页大小
 //"total_page": "1", 总共页数
@@ -148,26 +151,25 @@ func (t *threadList) UnmarshalJSON(b []byte) error {
 
 type User struct {
 	ID       string `json:"id"`
-	Name     string `json:"name,omitempty"`
-	NameShow string `json:"name_show"`
-	Portrait string `json:"portrait"` // 头像地址 http://tb.himg.baidu.com/sys/portrait/item/ + Portrait
+	Name     string `json:"name_show"` // 返回时有 name 字段, 但可能为空, 而且存在时应当也是与 name_show 一样的, 我们只需要一个名称标识即可
+	Portrait string `json:"portrait"`  // 头像地址 http://tb.himg.baidu.com/sys/portrait/item/ + Portrait
 }
 
 // 当前请求用户, 用于检查登录状态和所在贴吧权限
 type RequestUser struct {
 	User
 	IsLogin   string `json:"is_login"`
-	IsManager string `json:"is_manager,omitempty"`
-	IsMem     string `json:"is_mem,omitempty"`
+	IsManager string `json:"is_manager"`
+	IsMem     string `json:"is_mem"`
 }
 
 // 贴吧搜索接口数据结构
 type ThreadListResponse struct {
-	Forum       Forum       `json:"forum,omitempty"`
-	RequestUser RequestUser `json:"user,omitempty"`
-	Page        page        `json:"page,omitempty"`
-	ThreadList  threadList  `json:"thread_list,omitempty"`
-	UserList    []User      `json:"user_list,omitempty"`
+	Forum       Forum       `json:"forum"`
+	RequestUser RequestUser `json:"user"`
+	Page        page        `json:"page"`
+	ThreadList  threadList  `json:"thread_list"`
+	UserList    []User      `json:"user_list"`
 	ResponseStatus
 }
 
@@ -183,14 +185,14 @@ type ThreadListResponse struct {
 // 10, 语音: during_time, voice_md5, is_sub
 type Content struct {
 	Type       string `json:"type"`
-	Text       string `json:"text,omitempty"`
-	Link       string `json:"link,omitempty"`
-	C          string `json:"c,omitempty"`
-	BSize      string `json:"bsize,omitempty"`
-	ImgSrc     string `json:"origin_src,omitempty"`
-	UID        string `json:"uid,omitempty"`
-	VoiceMD5   string `json:"voice_md5,omitempty"`
-	DuringTime string `json:"during_time,omitempty"`
+	Text       string `json:"text,omitempty" bson:",omitempty"`
+	Link       string `json:"link,omitempty" bson:",omitempty"`
+	C          string `json:"c,omitempty" bson:",omitempty"`
+	BSize      string `json:"bsize,omitempty" bson:",omitempty"`
+	ImgSrc     string `json:"origin_src,omitempty" bson:",omitempty"`
+	UID        string `json:"uid,omitempty" bson:",omitempty"`
+	VoiceMD5   string `json:"voice_md5,omitempty" bson:",omitempty"`
+	DuringTime string `json:"during_time,omitempty" bson:",omitempty"`
 }
 
 func (c Content) GenerateText() string {
@@ -279,15 +281,15 @@ func (s *subPostList) UnmarshalJSON(b []byte) error {
 
 // 帖子详情接口
 type PostListResponse struct {
-	Forum       Forum       `json:"forum,omitempty"`
-	RequestUser RequestUser `json:"user,omitempty"`
+	Forum       Forum       `json:"forum"`
+	RequestUser RequestUser `json:"user"`
 	Thread      Thread      `json:"thread"`
-	Page        page        `json:"page,omitempty"`
+	Page        page        `json:"page"`
 	PostList    []struct {
 		Post
 		SubPostList subPostList `json:"sub_post_list"`
 	} `json:"post_list"`
-	UserList []User `json:"user_list,omitempty"`
+	UserList []User `json:"user_list"`
 	ResponseStatus
 }
 

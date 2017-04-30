@@ -1,8 +1,5 @@
 package talpa
 
-// todo: 支持设置停止目标, 如抓取到根据设置的最新更新日期是停止
-// todo: 内容监控按规则更新, 数据抓取后台更新
-
 import (
 	"fmt"
 	"runtime"
@@ -13,18 +10,18 @@ import (
 
 // 提供核心的爬虫工作分发机制, 只能运行一次
 type Crawler struct {
-	spiders           []Spider
-	requestScheduler  RequestScheduler
-	downloader        Downloader
-	jobScheduler      JobScheduler
-	scraper           Scraper
+	spiders          []Spider
+	requestScheduler RequestScheduler
+	downloader       Downloader
+	jobScheduler     JobScheduler
+	scraper          Scraper
 
 	requestLoopClosed bool
 	itemLoopClosed    bool
 	wg                sync.WaitGroup
 	stopped           chan bool
 
-	logger            *logrus.Entry
+	logger *logrus.Entry
 }
 
 func (c *Crawler) Closed() bool {
