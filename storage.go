@@ -21,15 +21,15 @@ func SessionFromConfig() *mgo.Session {
 func UpsertJob(collection *mgo.Collection, pairs ...interface{}) func() {
 	return func() {
 		defer collection.Database.Session.Close()
-		entry := Logger.WithField("Collection", collection.Name)
-		entry.WithField("paris", pairs).Warnln("开始进行数据插入任务")
+		entry := Logger.WithFields(logrus.Fields{"Collection": collection.Name, "NumItem": len(pairs) / 2})
+		entry.Debugln("开始进行数据插入任务")
 		bulk := collection.Bulk()
 		bulk.Upsert(pairs...)
 		result, err := bulk.Run()
 		if err != nil {
 			entry.Panicln(err)
 		}
-		entry.WithFields(logrus.Fields{"Matched": result.Matched, "Modified": result.Modified}).Info()
+		entry.WithFields(logrus.Fields{"Matched": result.Matched, "Modified": result.Modified}).Debugln()
 	}
 }
 
@@ -41,7 +41,6 @@ func ForumUpsert(items ...tieba.Forum) func() {
 		pairs[i] = selector
 		pairs[i+1] = item
 	}
-	Logger.WithField("PairsLen", len(pairs)).Warn()
 	return UpsertJob(SessionFromConfig().DB("").C("Forum"), pairs...)
 }
 

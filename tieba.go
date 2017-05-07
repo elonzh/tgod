@@ -45,6 +45,7 @@ func (t *TiebaSpider) ParseThreadList(res *gen.Response, helper talpa.Helper) {
 		helper.PutJob(UserUpsert(tlr.UserList...))
 	}
 	// todo: 当帖子最后更新时间小于上一次最新帖子更新时间则跳过
+
 	reqs := make([]*gen.Request, len(tlr.ThreadList))
 	entry.WithFields(logrus.Fields{"NumRequest": len(reqs)}).Debugln()
 	for i, thread := range tlr.ThreadList {

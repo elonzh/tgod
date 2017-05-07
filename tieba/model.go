@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"strconv"
 )
 
 type TextGenerator interface {
@@ -13,74 +12,61 @@ type TextGenerator interface {
 }
 
 type ResponseStatus struct {
-	ErrorCode string `json:"error_code"`
+	ErrorCode int    `json:"error_code,string"`
 	ErrorMsg  string `json:"error_msg"`
 }
 
 func (status ResponseStatus) String() string {
-	if status.ErrorCode == "0" {
-		return fmt.Sprintf("Success %s: %s", status.ErrorCode, status.ErrorMsg)
+	if status.ErrorCode == 0 {
+		return fmt.Sprintf("Success %: %s", status.ErrorCode, status.ErrorMsg)
 	}
 	return fmt.Sprintf("Error %s: %s", status.ErrorCode, status.ErrorMsg)
 }
 
 func (status ResponseStatus) CheckStatus() error {
-	if status.ErrorCode == "0" {
+	if status.ErrorCode == 0 {
 		return nil
 	}
 	return fmt.Errorf("Error %s: %s", status.ErrorCode, status.ErrorMsg)
 }
 
 type Forum struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	IsExists    string `json:"is_exists"` // 实际请求时贴吧不存在返回的是 error_code, 这个可能是贴吧被屏蔽的标志?
-	Avatar      string `json:"avatar"`
-	FirstClass  string `json:"first_class"`
-	SecondClass string `json:"second_class"`
-	Slogan      string `json:"slogan,omitempty"`
-	MemberNum   string `json:"member_num,omitempty"`
-	ThreadNum   string `json:"thread_num,omitempty"`
-	PostNum     string `json:"post_num,omitempty"`
-	IsReadonly  string `json:"is_readonly,omitempty"`
-	IsStageForm string `json:"is_stage_form,omitempty"`
+	ID          string    `json:"id"`
+	Name        string    `json:"name"`
+	IsExists    TiebaBool `json:"is_exists"` // 实际请求时贴吧不存在返回的是 error_code, 这个可能是贴吧被屏蔽的标志?
+	Avatar      string    `json:"avatar"`
+	FirstClass  string    `json:"first_class"`
+	SecondClass string    `json:"second_class"`
+	// 以下字段只有在请求帖子列表时得到
+	Slogan    string `json:"slogan,omitempty"`
+	MemberNum int    `json:"member_num,string,omitempty"`
+	ThreadNum int    `json:"thread_num,string,omitempty"`
+	PostNum   int    `json:"post_num,string,omitempty"`
 }
 
-// 返回的响应有 id 和 tid 两个字段, 当帖子没有 tid 时是一个广告贴
+// 帖子列表请求返回的响应有 id 和 tid 两个字段, 当帖子没有 tid 时是一个广告贴
 // reply_num 包括了楼中楼数量, 为总回帖量(不包括一楼), 不能用来计算页数
 // media 包含了帖子概览时的媒体文件, 这里不
 type Thread struct {
-	ID         string `json:"id"`
-	Title      string `json:"title"`
-	AuthorID   string `json:"author_id"`
-	ReplyNum   string `json:"reply_num"`
-	ViewNum    string `json:"view_num"`
-	CreateTime string `json:"create_time"`   // 类型为时间戳, 可能不存在此字段, 比如为直播贴
-	LastTime   string `json:"last_time_int"` // 类型为时间戳
-	IsTop      string `json:"is_top"`        // 置顶帖
-	IsGood     string `json:"is_good"`       // 精品贴
-	IsNotice   string `json:"is_notice"`     // 通知贴
-	IsProtal   string `json:"is_protal"`
-	IsBakan    string `json:"is_bakan"`    // 吧刊贴
-	IsVote     string `json:"is_vote"`     // 投票贴
-	IsActivity string `json:"is_activity"` // 活动帖
-	IsLivePost string `json:"is_livepost"` // 直播贴
+	ID         string    `json:"id"`
+	Title      string    `json:"title"`
+	ReplyNum   int       `json:"reply_num,string"`
+	CreateTime int64     `json:"create_time,string"` // 类型为时间戳, 可能不存在此字段, 比如为直播贴
+	IsActivity TiebaBool `json:"is_activity"`        // 活动帖
+	// 以下字段只有在请求帖子列表时得到
+	AuthorID   string    `json:"author_id"`
+	LastTime   int64     `json:"last_time_int,string"` // 类型为时间戳
+	ViewNum    string    `json:"view_num"`             // 浏览量, 可能为 NAN, INF
+	IsTop      TiebaBool `json:"is_top"`               // 置顶帖
+	IsGood     TiebaBool `json:"is_good"`              // 精品贴
+	IsNotice   TiebaBool `json:"is_notice"`            // 通知贴
+	IsBakan    TiebaBool `json:"is_bakan"`             // 吧刊贴
+	IsVote     TiebaBool `json:"is_vote"`              // 投票贴
+	IsLivePost TiebaBool `json:"is_livepost"`          // 直播贴, 不一定有此字段
 }
 
 func (t *Thread) String() string {
 	return fmt.Sprintf("<Thread %s: %s>", t.ID, t.Title)
-}
-
-func s2b(s string) bool {
-	switch s {
-	case "0":
-		return false
-	case "1":
-		return true
-	default:
-		Logger.Panicf("\"0\" or \"1\" itemScheduler expected, not %s", s)
-		return false
-	}
 }
 
 // 通用字段
@@ -100,33 +86,11 @@ func s2b(s string) bool {
 //"tnum": "0", 意义不明
 // 因此实际使用中只有 total_page, has_more, has_prev 有作用
 type page struct {
-	PageSize    int
-	TotalPage   int
-	CurrentPage int
-	HasMore     bool
-	HasPrev     bool
-}
-
-// 将分页值转换为数值避免每次操作都需要自行转换一次
-func (p *page) UnmarshalJSON(b []byte) error {
-	var err error
-	raw := make(map[string]string, 10)
-	err = json.Unmarshal(b, &raw)
-	if err != nil {
-		return err
-	}
-	if p.TotalPage, err = strconv.Atoi(raw["total_page"]); err != nil {
-		return err
-	}
-	if p.CurrentPage, err = strconv.Atoi(raw["current_page"]); err != nil {
-		return err
-	}
-	if p.PageSize, err = strconv.Atoi(raw["page_size"]); err != nil {
-		return err
-	}
-	p.HasMore = s2b(raw["has_more"])
-	p.HasMore = s2b(raw["has_prev"])
-	return err
+	PageSize    int       `json:"page_size,string"`
+	TotalPage   int       `json:"total_page,string"`
+	CurrentPage int       `json:"current_page,string"`
+	HasMore     TiebaBool `json:"has_more"`
+	HasPrev     TiebaBool `json:"has_prev"`
 }
 
 type threadList []Thread
@@ -158,9 +122,9 @@ type User struct {
 // 当前请求用户, 用于检查登录状态和所在贴吧权限
 type RequestUser struct {
 	User
-	IsLogin   string `json:"is_login"`
-	IsManager string `json:"is_manager"`
-	IsMem     string `json:"is_mem"`
+	IsLogin   TiebaBool `json:"is_login"`
+	IsManager TiebaBool `json:"is_manager"`
+	IsMem     TiebaBool `json:"is_mem"`
 }
 
 // 贴吧搜索接口数据结构
@@ -221,8 +185,8 @@ type Post struct {
 	ID       string    `json:"id"`
 	AuthorID string    `json:"author_id"`
 	Title    string    `json:"title"`
-	Floor    string    `json:"floor"`
-	Time     string    `json:"time"`
+	Floor    int       `json:"floor,string"`
+	Time     int64     `json:"time,string"`
 	Content  []Content `json:"content"`
 	ThreadID string    // 所属帖子ID, 需自行添加
 }
@@ -243,8 +207,8 @@ type SubPost struct {
 	ID       string    `json:"id"`
 	AuthorID string    `json:"author_id"`
 	Title    string    `json:"title"`
-	Floor    string    `json:"floor"`
-	Time     string    `json:"time"`
+	Floor    int       `json:"floor,string"`
+	Time     int64     `json:"time,string"`
 	Content  []Content `json:"content"`
 	PostID   string    // 楼中楼所属楼层ID, 需自行添加
 }

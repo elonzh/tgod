@@ -80,12 +80,23 @@ func (c *Crawler) loopItem() {
 		}()
 		// 即使请求任务已经结束, 只要还有未处理完的任务就继续下去
 		// todo: 假设任务处理得非常快, 一瞬间就处理完了所有等待的任务但队列还没清空呢?
-		for !c.requestLoopClosed || c.scraper.NumWaitingJobs() > 0 {
-			if !c.jobScheduler.Empty() && (c.scraper.NumWaitingJobs() < c.scraper.NumWorkers()) {
-				job := c.jobScheduler.Get(1)[0]
-				c.scraper.Send(job)
+		run := true
+		for run {
+			select {
+			case <-c.stopped:
+				run = false
+			default:
+				if !c.jobScheduler.Empty() {
+					if c.scraper.NumWaitingJobs() < c.scraper.NumWorkers() {
+						job := c.jobScheduler.Get(1)[0]
+						c.scraper.Send(job)
+					}
+				} else if c.requestLoopClosed && c.scraper.NumWaitingJobs() == 0 {
+					// 请求处理已完成, 调度器已为空, 也没有在等待处理的任务, 说明所有任务已处理完且没有后续任务
+					run = false
+				}
+				c.logger.WithFields(logrus.Fields{"NumItem": c.jobScheduler.Len(), "NumWaitingJobs": c.downloader.NumWaitingJobs()}).Debugln()
 			}
-			c.logger.WithFields(logrus.Fields{"NumItem": c.jobScheduler.Len(), "NumWaitingJobs": c.downloader.NumWaitingJobs()}).Debugln()
 			// goroutine 是协程, 主动释放CPU避免持续占用
 			runtime.Gosched()
 		}

@@ -136,7 +136,7 @@ func DumpRequest(req *http.Request, body bool) ([]byte, []byte, error) {
 	return headerBuf.Bytes(), bodyBuf.Bytes(), nil
 }
 
-// based on net/http/httputil.DumpRequest but return header and body separately
+// based on net/http/httputil.DumpResponse but return header and body separately
 // the body is original whether "Transfer-Encoding" is "chunked" or not
 func DumpResponse(resp *http.Response, body bool) ([]byte, []byte, error) {
 	var err error
