@@ -85,17 +85,19 @@ func TestClient_GetThreadList(t *testing.T) {
 func TestClient_GetPostList(t *testing.T) {
 	pldir := path.Join(dir, "pl")
 	for i, tt := range []struct {
-		tid      string
-		pn       int
-		rn       int
-		expected int
-		errCode  int
+		tid         string
+		pn          int
+		rn          int
+		withSubPost bool
+		expected    int
+		errCode     int
 	}{
-		{"4003196488", 1, 0, 0, 1989002},
-		{"4003196488", 1, 1, 0, 29},
-		{"4003196488", 1, 2, 2, 0},
-		{"4003196488", 1, 30, 30, 0},
-		{"4003196488", 1, 31, 30, 0},
+		{"4003196488", 1, 0, false, 0, 1989002},
+		{"4003196488", 1, 1, false, 0, 29},
+		{"4003196488", 1, 2, false, 2, 0},
+		{"4003196488", 1, 2, true, 2, 0},
+		{"4003196488", 1, 30, false, 30, 0},
+		{"4003196488", 1, 31, false, 30, 0},
 	} {
 		req := PostListRequest(tt.tid, tt.pn, tt.rn, false)
 		req.Use(http.Fingerprint(false))

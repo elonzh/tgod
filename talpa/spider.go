@@ -18,6 +18,8 @@ type Helper interface {
 	PutJob(jobs ...func())
 }
 
+var _ Helper = (*helper)(nil)
+
 type helper struct {
 	rs RequestScheduler
 	is JobScheduler

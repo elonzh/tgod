@@ -46,6 +46,8 @@ type downloader struct {
 	logger *logrus.Entry
 }
 
+var _ Downloader = (*downloader)(nil)
+
 func (d *downloader) Open() {
 	_, err := d.pool.Open()
 	if err != nil {

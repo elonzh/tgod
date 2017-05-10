@@ -116,7 +116,7 @@ func DumpRequest(req *http.Request, body bool) ([]byte, []byte, error) {
 		fmt.Fprintf(&headerBuf, "Transfer-Encoding: %s\r\n", strings.Join(req.TransferEncoding, ","))
 	}
 	if req.Close {
-		fmt.Fprintf(&headerBuf, "Connection: close\r\n")
+		fmt.Fprint(&headerBuf, "Connection: close\r\n")
 	}
 
 	err = req.Header.WriteSubset(&headerBuf, reqWriteExcludeHeaderDump)

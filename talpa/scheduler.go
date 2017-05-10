@@ -75,6 +75,8 @@ type requestScheduler struct {
 	logger *logrus.Entry
 }
 
+var _ RequestScheduler = (*requestScheduler)(nil)
+
 func (rs *requestScheduler) Dispose() {
 	rs.pq.Dispose()
 	rs.logger.Infoln("RequestScheduler disposed")
@@ -137,6 +139,8 @@ type jobScheduler struct {
 
 	logger *logrus.Entry
 }
+
+var _ JobScheduler = (*jobScheduler)(nil)
 
 func (is *jobScheduler) Dispose() {
 	is.q.Dispose()

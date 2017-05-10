@@ -4,6 +4,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/go-tgod/tgod/talpa"
 	"github.com/go-tgod/tgod/tieba"
+	"github.com/spf13/viper"
 	gen "gopkg.in/h2non/gentleman.v2"
 )
 
@@ -17,11 +18,18 @@ func NewTiebaSpider(forum string) *TiebaSpider {
 type TiebaSpider struct {
 	forum  string
 	logger *logrus.Entry
+	tlrn   int
+	plrn   int
 }
+
+var _ talpa.Spider = (*TiebaSpider)(nil)
 
 // 初始请求, 获取置顶帖吧最新(第一页)帖子列表
 func (t *TiebaSpider) StartRequests() []*gen.Request {
-	req := tieba.ThreadListRequest(t.forum, 1, 10)
+	t.tlrn = viper.GetInt("threadPaginate")
+	t.plrn = viper.GetInt("postPaginate")
+
+	req := tieba.ThreadListRequest(t.forum, 1, t.tlrn)
 	req.Context.Set("CallBack", t.ParseThreadList)
 	return []*gen.Request{req}
 }
@@ -40,7 +48,6 @@ func (t *TiebaSpider) ParseThreadList(res *gen.Response, helper talpa.Helper) {
 	}
 
 	helper.PutJob(ForumUpsert(tlr.Forum))
-	helper.PutJob(ThreadUpsert(tlr.ThreadList...))
 	if len(tlr.UserList) > 0 {
 		helper.PutJob(UserUpsert(tlr.UserList...))
 	}
@@ -49,22 +56,23 @@ func (t *TiebaSpider) ParseThreadList(res *gen.Response, helper talpa.Helper) {
 	reqs := make([]*gen.Request, len(tlr.ThreadList))
 	entry.WithFields(logrus.Fields{"NumRequest": len(reqs)}).Debugln()
 	for i, thread := range tlr.ThreadList {
-		req := tieba.PostListRequest(thread.ID, 1, 5, true)
-		//req := tieba.PostListRequest(thread.ID, 1, tieba.MaxPostNum, true)
+		thread.ForumID = tlr.Forum.ID
+		helper.PutJob(ThreadUpsert(thread))
+		req := tieba.PostListRequest(thread.ID, 1, t.plrn, true)
 		req.Context.Set("CallBack", t.ParsePostListPage)
 		reqs[i] = req
 	}
 	helper.PutRequest(reqs...)
 }
 
-func (t *TiebaSpider) handlePostList(entry *logrus.Entry, res *gen.Response, helper talpa.Helper) tieba.PostListResponse {
+func (t *TiebaSpider) handlePostList(entry *logrus.Entry, res *gen.Response, helper talpa.Helper) (tieba.PostListResponse, bool) {
 	plr := new(tieba.PostListResponse)
 	if err := res.JSON(plr); err != nil {
 		panic(err)
 	}
 	if err := plr.CheckStatus(); err != nil {
-		entry.WithField("Error", err).Warnln("获取帖子第一页楼层失败")
-		return *plr
+		entry.WithField("Error", err).Warnln("获取帖子楼层失败")
+		return *plr, false
 	}
 	entry.WithFields(logrus.Fields{
 		"ThreadTitle": plr.Thread.Title,
@@ -88,18 +96,21 @@ func (t *TiebaSpider) handlePostList(entry *logrus.Entry, res *gen.Response, hel
 	if len(subpostList) > 0 {
 		helper.PutJob(SubPostUpsert(subpostList...))
 	}
-	return *plr
+	return *plr, true
 }
 
 // 解析第一页回帖, 生成后序的请求
 func (t *TiebaSpider) ParsePostListPage(res *gen.Response, helper talpa.Helper) {
 	entry := t.logger.WithField("CallBack", "ParsePostListPage")
-	plr := t.handlePostList(entry, res, helper)
+	plr, ok := t.handlePostList(entry, res, helper)
+	if !ok {
+		return
+	}
 	// 第一页已经得到了
 	reqNum := plr.Page.TotalPage - 1
 	reqs := make([]*gen.Request, reqNum)
 	for i := 2; i <= plr.Page.TotalPage; i++ {
-		req := tieba.PostListRequest(plr.Thread.ID, i, tieba.MaxPostNum, true)
+		req := tieba.PostListRequest(plr.Thread.ID, i, t.plrn, true)
 		req.Context.Set("CallBack", t.ParsePostList)
 		reqs[i-2] = req
 	}

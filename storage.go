@@ -3,12 +3,13 @@ package tgod
 import (
 	"github.com/Sirupsen/logrus"
 	"github.com/go-tgod/tgod/tieba"
+	"github.com/spf13/viper"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
 
 func SessionFromConfig() *mgo.Session {
-	session, err := mgo.Dial(GlobalConfig.Database)
+	session, err := mgo.Dial(viper.GetString("database"))
 	if err != nil {
 		Logger.Fatalln(err)
 	}

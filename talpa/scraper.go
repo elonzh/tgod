@@ -21,6 +21,8 @@ type scraper struct {
 	logger *logrus.Entry
 }
 
+var _ Scraper = (*scraper)(nil)
+
 func (s *scraper) Open() {
 	_, err := s.pool.Open()
 	if err != nil {

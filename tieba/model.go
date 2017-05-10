@@ -18,7 +18,7 @@ type ResponseStatus struct {
 
 func (status ResponseStatus) String() string {
 	if status.ErrorCode == 0 {
-		return fmt.Sprintf("Success %: %s", status.ErrorCode, status.ErrorMsg)
+		return fmt.Sprintf("Success %s: %s", status.ErrorCode, status.ErrorMsg)
 	}
 	return fmt.Sprintf("Error %s: %s", status.ErrorCode, status.ErrorMsg)
 }
@@ -33,15 +33,15 @@ func (status ResponseStatus) CheckStatus() error {
 type Forum struct {
 	ID          string    `json:"id"`
 	Name        string    `json:"name"`
-	IsExists    TiebaBool `json:"is_exists"` // 实际请求时贴吧不存在返回的是 error_code, 这个可能是贴吧被屏蔽的标志?
+	IsExists    TiebaBool `json:"is_exists" bson:"is_exists"` // 实际请求时贴吧不存在返回的是 error_code, 这个可能是贴吧被屏蔽的标志?
 	Avatar      string    `json:"avatar"`
-	FirstClass  string    `json:"first_class"`
-	SecondClass string    `json:"second_class"`
+	FirstClass  string    `json:"first_class" bson:"first_class"`
+	SecondClass string    `json:"second_class" bson:"second_class"`
 	// 以下字段只有在请求帖子列表时得到
 	Slogan    string `json:"slogan,omitempty"`
-	MemberNum int    `json:"member_num,string,omitempty"`
-	ThreadNum int    `json:"thread_num,string,omitempty"`
-	PostNum   int    `json:"post_num,string,omitempty"`
+	MemberNum int    `json:"member_num,string,omitempty"  bson:"member_num"`
+	ThreadNum int    `json:"thread_num,string,omitempty" bson:"thread_num"`
+	PostNum   int    `json:"post_num,string,omitempty" bson:"post_num"`
 }
 
 // 帖子列表请求返回的响应有 id 和 tid 两个字段, 当帖子没有 tid 时是一个广告贴
@@ -50,19 +50,20 @@ type Forum struct {
 type Thread struct {
 	ID         string    `json:"id"`
 	Title      string    `json:"title"`
-	ReplyNum   int       `json:"reply_num,string"`
-	CreateTime int64     `json:"create_time,string"` // 类型为时间戳, 可能不存在此字段, 比如为直播贴
-	IsActivity TiebaBool `json:"is_activity"`        // 活动帖
+	ReplyNum   int       `json:"reply_num,string" bson:"reply_num"`
+	CreateTime TiebaTime `json:"create_time" bson:"create_time"` // 类型为时间戳, 可能不存在此字段, 比如为直播贴
+	IsActivity TiebaBool `json:"is_activity" bson:"is_activity"` // 活动帖
 	// 以下字段只有在请求帖子列表时得到
-	AuthorID   string    `json:"author_id"`
-	LastTime   int64     `json:"last_time_int,string"` // 类型为时间戳
-	ViewNum    string    `json:"view_num"`             // 浏览量, 可能为 NAN, INF
-	IsTop      TiebaBool `json:"is_top"`               // 置顶帖
-	IsGood     TiebaBool `json:"is_good"`              // 精品贴
-	IsNotice   TiebaBool `json:"is_notice"`            // 通知贴
-	IsBakan    TiebaBool `json:"is_bakan"`             // 吧刊贴
-	IsVote     TiebaBool `json:"is_vote"`              // 投票贴
-	IsLivePost TiebaBool `json:"is_livepost"`          // 直播贴, 不一定有此字段
+	AuthorID   string    `json:"author_id" bson:"author_id"`
+	LastTime   TiebaTime `json:"last_time_int" bson:"last_time"` // 类型为时间戳
+	ViewNum    TiebaUInt `json:"view_num" bson:"view_num"`       // 浏览量, 可能为 NAN, INF
+	IsTop      TiebaBool `json:"is_top" bson:"is_top"`           // 置顶帖
+	IsGood     TiebaBool `json:"is_good" bson:"is_good"`         // 精品贴
+	IsNotice   TiebaBool `json:"is_notice" bson:"is_notice"`     // 通知贴
+	IsBakan    TiebaBool `json:"is_bakan" bson:"is_bakan"`       // 吧刊贴
+	IsVote     TiebaBool `json:"is_vote" bson:"is_vote"`         // 投票贴
+	IsLivePost TiebaBool `json:"is_livepost" bson:"is_livepost"` // 直播贴, 不一定有此字段
+	ForumID    string    `json:"forum_id" bson:"forum_id"`       // 所属贴吧ID, 需自行添加
 }
 
 func (t *Thread) String() string {
@@ -153,10 +154,10 @@ type Content struct {
 	Link       string `json:"link,omitempty" bson:",omitempty"`
 	C          string `json:"c,omitempty" bson:",omitempty"`
 	BSize      string `json:"bsize,omitempty" bson:",omitempty"`
-	ImgSrc     string `json:"origin_src,omitempty" bson:",omitempty"`
+	ImgSrc     string `json:"origin_src,omitempty" bson:"img_src,omitempty"`
 	UID        string `json:"uid,omitempty" bson:",omitempty"`
-	VoiceMD5   string `json:"voice_md5,omitempty" bson:",omitempty"`
-	DuringTime string `json:"during_time,omitempty" bson:",omitempty"`
+	VoiceMD5   string `json:"voice_md5,omitempty" bson:"voice_md5,omitempty"`
+	DuringTime string `json:"during_time,omitempty" bson:"during_time,omitempty"`
 }
 
 func (c Content) GenerateText() string {
@@ -183,12 +184,12 @@ func (c Content) GenerateText() string {
 
 type Post struct {
 	ID       string    `json:"id"`
-	AuthorID string    `json:"author_id"`
+	AuthorID string    `json:"author_id" bson:"author_id"`
 	Title    string    `json:"title"`
 	Floor    int       `json:"floor,string"`
-	Time     int64     `json:"time,string"`
+	Time     TiebaTime `json:"time"`
 	Content  []Content `json:"content"`
-	ThreadID string    // 所属帖子ID, 需自行添加
+	ThreadID string    `json:"thread_id" bson:"thread_id"` // 所属帖子ID, 需自行添加
 }
 
 func (p Post) GenerateText() string {
@@ -205,12 +206,12 @@ func (p Post) GenerateText() string {
 // 虽然其内容类型与楼层是一样的, 但其重要性更低
 type SubPost struct {
 	ID       string    `json:"id"`
-	AuthorID string    `json:"author_id"`
+	AuthorID string    `json:"author_id" bson:"author_id"`
 	Title    string    `json:"title"`
 	Floor    int       `json:"floor,string"`
-	Time     int64     `json:"time,string"`
+	Time     TiebaTime `json:"time"`
 	Content  []Content `json:"content"`
-	PostID   string    // 楼中楼所属楼层ID, 需自行添加
+	PostID   string    `json:"post_id" bson:"post_id"` // 楼中楼所属楼层ID, 需自行添加
 }
 
 // 没有楼回复时为 "sub_post_list: []", 否则为 "sub_post_list: {"pid": "...", sub_post_list:[...]}"
